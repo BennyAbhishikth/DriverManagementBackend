@@ -45,23 +45,79 @@ app.get('/test-cors', (req, res) => {
 
 const upload = multer({ dest: 'uploads/' });
 
-app.post("/addDriver",(req,res) => {
+// app.post("/addDriver",(req,res) => {
 
-    const {driverId,name,mobile,email,gender,age,dob,address,aadhar,pan,lic,exp,imageUrl,vehicleId} = req.body
+//     const {driverId,name,mobile,email,gender,age,dob,address,aadhar,pan,lic,exp,imageUrl,vehicleId} = req.body
 
-    const query = `INSERT INTO driver_details (driverId,name,mobile,email,gender,age,dob,address,aadhar,pan,lic,exp,imageUrl,vehicleId) 
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+//     const query = `INSERT INTO driver_details (driverId,name,mobile,email,gender,age,dob,address,aadhar,pan,lic,exp,imageUrl,vehicleId) 
+//     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
-    db.query(query ,  [driverId,name,mobile,email,gender,age,dob,address,aadhar,pan,lic,exp,imageUrl,vehicleId],(err , result) => {
-        if(err) {
-            console.log(err);
-            res.status(500).send({message : "Error in adding driver" })
-        }
-        res.status(201).json({ message: 'Driver added successfully', driverId: result.insertId });
+//     db.query(query ,  [driverId,name,mobile,email,gender,age,dob,address,aadhar,pan,lic,exp,imageUrl,vehicleId],(err , result) => {
+//         if(err) {
+//             console.log(err);
+//             res.status(500).send({message : "Error in adding driver" })
+//         }
+//         res.status(201).json({ message: 'Driver added successfully', driverId: result.insertId });
         
-    })
+//     })
 
-})
+// })
+
+app.post("/addDriver", (req, res) => {
+    const { driverId, name, mobile, email, gender, age, dob, address, aadhar, pan, lic, exp, imageUrl, vehicleId } = req.body;
+
+    const insertDriverQuery = `
+        INSERT INTO driver_details (driverId, name, mobile, email, gender, age, dob, address, aadhar, pan, lic, exp, imageUrl, vehicleId) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const updateVehicleQuery = `
+        UPDATE vehicle_details 
+        SET driverId = ? 
+        WHERE vehicleId = ?
+    `;
+
+    // Start a database transaction
+    db.beginTransaction((err) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).send({ message: "Error in starting transaction" });
+        }
+
+        // Insert the driver details
+        db.query(insertDriverQuery, [driverId, name, mobile, email, gender, age, dob, address, aadhar, pan, lic, exp, imageUrl, vehicleId], (err, result) => {
+            if (err) {
+                return db.rollback(() => {
+                    console.log(err);
+                    res.status(500).send({ message: "Error in adding driver" });
+                });
+            }
+
+            // Update the vehicle details with the driverId
+            db.query(updateVehicleQuery, [driverId, vehicleId], (err, result) => {
+                if (err) {
+                    return db.rollback(() => {
+                        console.log(err);
+                        res.status(500).send({ message: "Error in updating vehicle details" });
+                    });
+                }
+
+                // Commit the transaction
+                db.commit((err) => {
+                    if (err) {
+                        return db.rollback(() => {
+                            console.log(err);
+                            res.status(500).send({ message: "Error in committing transaction" });
+                        });
+                    }
+
+                    res.status(201).json({ message: 'Driver added and vehicle updated successfully', driverId });
+                });
+            });
+        });
+    });
+});
+
 
 // app.get("/getDrivers",(req,res) => {
 //     const query = `SELECT * FROM driver_details`;
